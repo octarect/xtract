@@ -38,29 +38,35 @@ func (d *Decoder) Decode(v any) error {
 		return fmt.Errorf("failed to parse document: %v", err)
 	}
 
-	return d.unmarshal(doc, val, "", "")
+	return d.unmarshal(doc, val, reflect.StructField{})
 }
 
-func (d *Decoder) unmarshal(doc *html.Node, val reflect.Value, fieldName, tag string) error {
+func (d *Decoder) unmarshal(doc *html.Node, val reflect.Value, field reflect.StructField) error {
 	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
 
 	switch val.Kind() {
 	case reflect.String:
+		tag := field.Tag.Get(d.tagName)
+		// Skip if no tag is provided
+		if tag == "" {
+			return nil
+		}
+
 		node, err := htmlquery.Query(doc, tag)
 		if err != nil {
-			return fmt.Errorf("invalid xpath found in struct tag. field=%s, tag=%s", fieldName, tag)
+			return fmt.Errorf("invalid xpath found in struct tag. field=%s, tag=%s", field.Name, tag)
 		}
 		if node == nil {
-			return fmt.Errorf("no match found. field=%s, tag=%s", fieldName, tag)
+			return fmt.Errorf("no match found. field=%s, tag=%s", field.Name, tag)
 		}
 		text := htmlquery.InnerText(node)
 		val.SetString(text)
 	case reflect.Struct:
 		t := val.Type()
 		for i := 0; i < t.NumField(); i++ {
-			d.unmarshal(doc, val.Field(i), t.Field(i).Name, t.Field(i).Tag.Get(d.tagName))
+			d.unmarshal(doc, val.Field(i), t.Field(i))
 		}
 	default:
 		return fmt.Errorf("unknown type. type=%s", val.Type().String())
