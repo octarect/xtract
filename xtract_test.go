@@ -8,36 +8,6 @@ import (
 	"time"
 )
 
-// Simple HTML page
-var doc = `
-<!DOCTYPE html>
-<html lang="en">
-	<head>
-		<meta charset="UTF-8">
-		<title>test page</title>
-	</head>
-	<body>
-		<span class="field">field1</span>
-		<span class="field">field2</span>
-		<p>
-			<span class="field">nested</span>
-		</p>
-		<span class="time">1970-01-01 00:00:00</span>
-	</body>
-</html>
-`
-
-type CustomTime struct {
-	time.Time
-}
-
-func (t *CustomTime) UnmarshalXPath(data []byte) (err error) {
-	t.Time, err = time.Parse("2006-01-02 15:04:05", string(data))
-	return
-}
-
-var CustomTimeExample = CustomTime{time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)}
-
 func TestDecodeError(t *testing.T) {
 	type Result struct{}
 
@@ -57,7 +27,7 @@ func TestDecodeError(t *testing.T) {
 	}
 }
 
-func testDecode[T any](t *testing.T, result, expected T) {
+func testDecode[T any](t *testing.T, doc string, result, expected T) {
 	r := strings.NewReader(doc)
 	err := NewDecoder(r).Decode(&result)
 	if err != nil {
@@ -69,28 +39,38 @@ func testDecode[T any](t *testing.T, result, expected T) {
 }
 
 func TestDecodeString(t *testing.T) {
+	doc := `
+	<html>
+		<body>
+			<span class="field">field1</span>
+		</body>
+	</html>`
+
 	type Result struct {
 		// Basic
 		Field       string `xpath:"//*[@class=\"field\"][1]"`
 		Untagged    string
-
-		// CustomUnmarshaler
-		Time CustomTime `xpath:"//span[@class=\"time\"]"`
 	}
 
 	expected := Result{
 		Field:    "field1",
 		Untagged: "",
-		Time: CustomTimeExample,
 	}
 
 	var result Result
-	testDecode(t, result, expected)
+	testDecode(t, doc, result, expected)
 }
 
 func TestDecodeNestedStruct(t *testing.T) {
+	doc := `
+	<html>
+		<body>
+			<span class="string">string</span>
+		</body>
+	</html>`
+
 	type Nested struct {
-		Field string `xpath:"//p/span[@class=\"field\"]"`
+		Field string `xpath:"//span[@class=\"string\"]"`
 	}
 	type Result struct {
 		Nested
@@ -98,15 +78,34 @@ func TestDecodeNestedStruct(t *testing.T) {
 
 	expected := Result{
 		Nested: Nested{
-			Field: "nested",
+			Field: "string",
 		},
 	}
 
 	var result Result
-	testDecode(t, result, expected)
+	testDecode(t, doc, result, expected)
 }
 
+type CustomTime struct {
+	time.Time
+}
+
+func (t *CustomTime) UnmarshalXPath(data []byte) (err error) {
+	t.Time, err = time.Parse("2006-01-02 15:04:05", string(data))
+	return
+}
+
+var CustomTimeExample = CustomTime{time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)}
+
 func TestCustomUnmarshaler(t *testing.T) {
+	var doc = `
+	<!DOCTYPE html>
+	<html lang="en">
+		<body>
+			<span class="time">1970-01-01 00:00:00</span>
+		</body>
+	</html>`
+
 	type Result struct {
 		Time CustomTime `xpath:"//span[@class=\"time\"]"`
 	}
@@ -116,7 +115,7 @@ func TestCustomUnmarshaler(t *testing.T) {
 	}
 
 	var result Result
-	testDecode(t, result, expected)
+	testDecode(t, doc, result, expected)
 }
 
 func TestDereference(t *testing.T) {

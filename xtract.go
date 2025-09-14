@@ -46,33 +46,37 @@ func (d *Decoder) Decode(v any) error {
 }
 
 func (d *Decoder) unmarshal(doc *html.Node, val reflect.Value, field *reflect.StructField) error {
+	var (
+		tag  string
+		text string
+		err  error
+	)
+
 	val, u := dereference(val)
 
-	var tag string
 	if field != nil {
 		tag = field.Tag.Get(d.tagName)
 	}
 
-	if u != nil {
-		text, err := searchByTag(doc, tag)
+	if tag != "" {
+		text, err = searchByTag(doc, tag)
 		if err != nil {
 			return err
 		}
+	}
+
+	// Skip if no tag is provided to non-struct fields.
+	if tag == "" && val.Kind() != reflect.Struct {
+		return nil
+	}
+
+	// If the type implements Unmarshaler, call user-defined unmarshaling method.
+	if u != nil {
 		return u.UnmarshalXPath([]byte(text))
 	}
 
 	switch val.Kind() {
 	case reflect.String:
-		// Skip if no tag is provided
-		if tag == "" {
-			return nil
-		}
-
-		text, err := searchByTag(doc, tag)
-		if err != nil {
-			return err
-		}
-
 		val.SetString(text)
 	case reflect.Struct:
 		t := val.Type()
@@ -103,6 +107,7 @@ func dereference(val reflect.Value) (reflect.Value, Unmarshaler) {
 }
 
 func dereference0(val reflect.Value, u Unmarshaler) (reflect.Value, Unmarshaler) {
+	// Return if the underlying value is found.
 	if val.Kind() != reflect.Pointer {
 		return val, u
 	}
