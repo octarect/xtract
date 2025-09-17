@@ -42,23 +42,23 @@ func TestDecodeString(t *testing.T) {
 	doc := `
 	<html>
 		<body>
-			<span class="field">field1</span>
+			<span class="string">string</span>
 		</body>
 	</html>`
 
 	type Result struct {
-		// Basic
-		Field       string `xpath:"//*[@class=\"field\"][1]"`
-		Untagged    string
+		String    string `xpath:"//span[@class=\"string\"]"`
+		StringPtr *string `xpath:"//span[@class=\"string\"]"`
 	}
 
+	str := "string"
+	strPtr := &str
 	expected := Result{
-		Field:    "field1",
-		Untagged: "",
+		String: str,
+		StringPtr: strPtr,
 	}
 
-	var result Result
-	testDecode(t, doc, result, expected)
+	testDecode(t, doc, Result{}, expected)
 }
 
 func TestDecodeNestedStruct(t *testing.T) {

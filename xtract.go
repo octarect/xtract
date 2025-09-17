@@ -112,6 +112,11 @@ func dereference0(val reflect.Value, u Unmarshaler) (reflect.Value, Unmarshaler)
 		return val, u
 	}
 
+	// If the pointer is nil, allocate a new value to return later.
+	if val.IsNil() {
+		val.Set(reflect.New(val.Type().Elem()))
+	}
+
 	if val.Type().NumMethod() > 0 && val.CanInterface() {
 		if u, ok := val.Interface().(Unmarshaler); ok {
 			return dereference0(val.Elem(), u)
