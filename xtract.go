@@ -6,7 +6,6 @@ import (
 	"io"
 	"reflect"
 
-	"github.com/antchfx/htmlquery"
 	"golang.org/x/net/html"
 )
 
@@ -47,26 +46,26 @@ func (d *Decoder) Decode(v any) error {
 
 func (d *Decoder) unmarshal(doc *html.Node, val reflect.Value, field *reflect.StructField) error {
 	var (
-		tag  string
+		xtag *xpathTag
 		text string
-		err  error
 	)
 
 	val, u := dereference(val)
 
-	if field != nil {
-		tag = field.Tag.Get(d.tagName)
+	if field != nil && field.Tag.Get(d.tagName) != "" {
+		xtag = newXpathTag(field.Tag.Get(d.tagName))
 	}
 
-	if tag != "" {
-		text, err = searchByTag(doc, tag)
+	if xtag != nil {
+		texts, err := xtag.Search(doc)
 		if err != nil {
 			return err
 		}
+		text = texts[0]
 	}
 
 	// Skip if no tag is provided to non-struct fields.
-	if tag == "" && val.Kind() != reflect.Struct {
+	if xtag == nil && val.Kind() != reflect.Struct {
 		return nil
 	}
 
@@ -124,16 +123,4 @@ func dereference0(val reflect.Value, u Unmarshaler) (reflect.Value, Unmarshaler)
 	}
 
 	return dereference0(val.Elem(), u)
-}
-
-// Search the HTML document using the provided XPath tag and returns the inner text of the matched node.
-func searchByTag(doc *html.Node, tag string) (string, error) {
-	node, err := htmlquery.Query(doc, tag)
-	if err != nil {
-		return "", fmt.Errorf("invalid xpath found in struct tag. tag=%s", tag)
-	}
-	if node == nil {
-		return "", fmt.Errorf("no match found. tag=%s", tag)
-	}
-	return htmlquery.InnerText(node), nil
 }
