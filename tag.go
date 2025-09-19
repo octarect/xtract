@@ -24,7 +24,7 @@ func (t *xpathTag) Search(doc *html.Node) ([]string, error) {
 		return nil, fmt.Errorf("invalid xpath found in struct tag. tag=%s", t.xpath)
 	}
 	if nodes == nil {
-		return nil, fmt.Errorf("no match found. tag=%s", t.xpath)
+		return nil, nil
 	}
 
 	ret := make([]string, len(nodes))

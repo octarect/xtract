@@ -61,7 +61,9 @@ func (d *Decoder) unmarshal(doc *html.Node, val reflect.Value, field *reflect.St
 		if err != nil {
 			return err
 		}
-		text = texts[0]
+		if len(texts) > 0 {
+			text = texts[0]
+		}
 	}
 
 	// Skip if no tag is provided to non-struct fields.
