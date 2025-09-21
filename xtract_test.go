@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/net/html"
 )
 
 func TestDecodeError(t *testing.T) {
@@ -116,6 +118,78 @@ func TestCustomUnmarshaler(t *testing.T) {
 
 	var result Result
 	testDecode(t, doc, result, expected)
+}
+
+func TestUnmarshal(t *testing.T) {
+	doc, err := html.Parse(strings.NewReader("<span>hello</span>"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type Result struct {
+		Field string `xpath:"//span"`
+	}
+
+	tests := []struct {
+		name    string
+		input   any
+		tag     string
+		texts   []string
+		want    any
+		wantErr bool
+	}{
+		{"invalid", "", "//a[id=']/span", nil, "", true},
+		{"notfound", "", `//span[@class=\"notfound\"]`, nil, "", false},
+		{"success", "", "//span", nil, "hello", false},
+		{"string", "", "", []string{"foo"}, "foo", false},
+		{"string pointer", new(string), "", []string{"foo"}, "foo", false},
+		{"struct", Result{}, "", nil, Result{"hello"}, false},
+		{"struct pointer", &Result{}, "", nil, Result{"hello"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var v reflect.Value
+			if tt.tag == "" {
+				// Wrap input in a struct field to make it addressable.
+				sf := reflect.StructField{
+					Name: "DummyField",
+					Type: reflect.TypeOf(tt.input),
+					Tag:  reflect.StructTag(`xpath:"//dummy"`),
+				}
+				v = reflect.New(sf.Type).Elem()
+			} else {
+				// Make a struct with the specified tag to test behavior with tag.
+				sf := reflect.StructField{
+					Name: "TestField",
+					Type: reflect.TypeOf(tt.input),
+					Tag:  reflect.StructTag(fmt.Sprintf(`xpath:"%s"`, tt.tag)),
+				}
+				st := reflect.StructOf([]reflect.StructField{sf})
+				v = reflect.New(st).Elem()
+			}
+
+			err = NewDecoder(nil).unmarshal(doc, v, tt.texts)
+			if tt.wantErr == (err == nil) {
+				t.Errorf("unexpected error status: %v", err)
+			}
+
+			if tt.tag != "" {
+				v = v.Field(0)
+			}
+
+			var got any
+			if v.Kind() == reflect.Pointer {
+				got = v.Elem().Interface()
+			} else {
+				got = v.Interface()
+			}
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("expected %+v (%T), got %+v (%T)", tt.want, tt.want, got, got)
+			}
+		})
+	}
 }
 
 func TestDereference(t *testing.T) {

@@ -44,52 +44,44 @@ func (d *Decoder) Decode(v any) error {
 	return d.unmarshal(doc, val, nil)
 }
 
-func (d *Decoder) unmarshal(doc *html.Node, val reflect.Value, field *reflect.StructField) error {
-	var (
-		xtag *xpathTag
-		text string
-	)
+func (d *Decoder) unmarshal(doc *html.Node, v reflect.Value, texts []string) error {
+	v, u := dereference(v)
 
-	val, u := dereference(val)
-
-	if field != nil && field.Tag.Get(d.tagName) != "" {
-		xtag = newXpathTag(field.Tag.Get(d.tagName))
-	}
-
-	if xtag != nil {
-		texts, err := xtag.Search(doc)
-		if err != nil {
-			return err
-		}
-		if len(texts) > 0 {
-			text = texts[0]
-		}
-	}
-
-	// Skip if no tag is provided to non-struct fields.
-	if xtag == nil && val.Kind() != reflect.Struct {
+	// Skip if no text is provided to non-struct fields.
+	if texts == nil && v.Kind() != reflect.Struct {
 		return nil
 	}
 
 	// If the type implements Unmarshaler, call user-defined unmarshaling method.
 	if u != nil {
-		return u.UnmarshalXPath([]byte(text))
+		return u.UnmarshalXPath([]byte(texts[0]))
 	}
 
-	switch val.Kind() {
+	switch v.Kind() {
 	case reflect.String:
-		val.SetString(text)
+		v.SetString(texts[0])
 	case reflect.Struct:
-		t := val.Type()
+		t := v.Type()
 		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
-			err := d.unmarshal(doc, val.Field(i), &field)
+			tag := t.Field(i).Tag.Get(d.tagName)
+
+			var texts0 []string
+			if tag != "" {
+				xtag := newXpathTag(tag)
+
+				texts0, err = xtag.Search(doc)
+				if err != nil {
+					return err
+				}
+			}
+
+			err := d.unmarshal(doc, v.Field(i), texts0)
 			if err != nil {
 				return err
 			}
 		}
 	default:
-		return fmt.Errorf("unsupported type. field=%s, type=%s", field.Name, val.Type())
+		return fmt.Errorf("unsupported type. type=%s", v.Type())
 	}
 
 	return nil
