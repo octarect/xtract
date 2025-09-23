@@ -126,7 +126,7 @@ func TestUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	type Result struct {
+	type result struct {
 		Field string `xpath:"//span"`
 	}
 
@@ -138,13 +138,20 @@ func TestUnmarshal(t *testing.T) {
 		want    any
 		wantErr bool
 	}{
-		{"invalid", "", "//a[id=']/span", nil, "", true},
-		{"notfound", "", `//span[@class=\"notfound\"]`, nil, "", false},
-		{"success", "", "//span", nil, "hello", false},
+		// Handling the problems about xpath tags
+		{"invalid tag", "", "//a[id=']/span", nil, "", true},
+		{"useless tag", "", `//span[@class=\"notfound\"]`, nil, "", false},
+		{"valid tag", "", "//span", nil, "hello", false},
+
+		// Nothing should be done with nil or empty slices
+		{"nil texts", "", "", []string(nil), "", false},
+		{"empty texts", "", "", []string{}, "", false},
+
+		// Types
 		{"string", "", "", []string{"foo"}, "foo", false},
 		{"string pointer", new(string), "", []string{"foo"}, "foo", false},
-		{"struct", Result{}, "", nil, Result{"hello"}, false},
-		{"struct pointer", &Result{}, "", nil, Result{"hello"}, false},
+		{"struct", result{}, "", nil, result{"hello"}, false},
+		{"struct pointer", &result{}, "", nil, result{"hello"}, false},
 	}
 
 	for _, tt := range tests {

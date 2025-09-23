@@ -48,7 +48,7 @@ func (d *Decoder) unmarshal(doc *html.Node, v reflect.Value, texts []string) err
 	v, u := dereference(v)
 
 	// Skip if no text is provided to non-struct fields.
-	if texts == nil && v.Kind() != reflect.Struct {
+	if len(texts) == 0 && v.Kind() != reflect.Struct {
 		return nil
 	}
 
