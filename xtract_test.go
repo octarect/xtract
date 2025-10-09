@@ -66,75 +66,80 @@ func (t *customTime) UnmarshalXPath(data []byte) (err error) {
 }
 
 func TestUnmarshal(t *testing.T) {
-	doc, err := html.Parse(strings.NewReader("<span>hello</span>"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	type result struct {
 		Field string `xpath:"//span"`
+	}
+	type invalidTag struct {
+		Field string `xpath:"//a[id=']/span"`
+	}
+	type notFound struct {
+		Field string `xpath:"//span[@class=\"notfound\"]"`
 	}
 
 	tests := []struct {
 		name    string
 		input   any
-		tag     string
 		texts   []string
 		want    any
 		wantErr bool
 	}{
-		// Handling the problems about xpath tags
-		{"invalid tag", "", "//a[id=']/span", nil, "", true},
-		{"useless tag", "", `//span[@class=\"notfound\"]`, nil, "", false},
-		{"valid tag", "", "//span", nil, "hello", false},
+		// Handling the invalid tag
+		{"invalid tag", invalidTag{}, []string{"text"}, "", true},
+		{"notfound", notFound{}, []string{"text"}, notFound{}, false},
 
-		// Nothing should be done with nil or empty slices
-		{"nil texts", "", "", []string(nil), "", false},
-		{"empty texts", "", "", []string{}, "", false},
+		// Nothing should be done with empty text
+		{"allow empty", "", []string{""}, "", false},
 
 		// Types
-		{"string", "", "", []string{"foo"}, "foo", false},
-		{"string pointer", new(string), "", []string{"foo"}, "foo", false},
-		{"struct", result{}, "", nil, result{"hello"}, false},
-		{"struct pointer", &result{}, "", nil, result{"hello"}, false},
+		{"string", "", []string{"foo"}, "foo", false},
+		{"string pointer", new(string), []string{"foo"}, "foo", false},
+		{"struct", result{}, []string{"foo"}, result{"foo"}, false},
+		{"struct pointer", &result{}, []string{"foo"}, result{"foo"}, false},
+		{"slice empty", []string(nil), nil, []string(nil), false},
+		{"slice 1", []string{}, []string{"foo"}, []string{"foo"}, false},
+		{"slice N", []string{}, []string{"foo", "bar"}, []string{"foo", "bar"}, false},
+
+		// Unmarshaler
+		{"unmarshaler", customTime{}, []string{"1970-01-01 00:00:00"}, customTime{time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)}, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var v reflect.Value
-			if tt.tag == "" {
-				// Wrap input in a struct field to make it addressable.
-				sf := reflect.StructField{
-					Name: "DummyField",
-					Type: reflect.TypeOf(tt.input),
-					Tag:  reflect.StructTag(`xpath:"//dummy"`),
-				}
-				v = reflect.New(sf.Type).Elem()
-			} else {
-				// Make a struct with the specified tag to test behavior with tag.
-				sf := reflect.StructField{
-					Name: "TestField",
-					Type: reflect.TypeOf(tt.input),
-					Tag:  reflect.StructTag(fmt.Sprintf(`xpath:"%s"`, tt.tag)),
-				}
-				st := reflect.StructOf([]reflect.StructField{sf})
-				v = reflect.New(st).Elem()
+			// Make a struct with the specified tag to test behavior with tag.
+			sf := reflect.StructField{
+				Name: "TestField",
+				Type: reflect.TypeOf(tt.input),
+				Tag:  reflect.StructTag(`xpath:"//span"`),
+			}
+			st := reflect.StructOf([]reflect.StructField{sf})
+			v := reflect.New(st).Elem()
+
+			// Generate document for testing
+			var htmlLines []string
+			for _, text := range tt.texts {
+				htmlLines = append(htmlLines, fmt.Sprintf("<span>%s</span>", text))
+			}
+			doc, err := html.Parse(strings.NewReader(strings.Join(htmlLines, "\n")))
+			if err != nil {
+				t.Fatal(err)
 			}
 
-			err = NewDecoder(nil).unmarshal(doc, v, tt.texts)
+			err = NewDecoder(nil).unmarshal(doc, v, nil)
 			if tt.wantErr == (err == nil) {
 				t.Errorf("unexpected error status: %v", err)
+				return
+			}
+			if tt.wantErr {
+				return
 			}
 
-			if tt.tag != "" {
-				v = v.Field(0)
-			}
+			v0 := v.Field(0)
 
 			var got any
-			if v.Kind() == reflect.Pointer {
-				got = v.Elem().Interface()
+			if v0.Kind() == reflect.Pointer {
+				got = v0.Elem().Interface()
 			} else {
-				got = v.Interface()
+				got = v0.Interface()
 			}
 
 			if !reflect.DeepEqual(got, tt.want) {

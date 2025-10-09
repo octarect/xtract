@@ -44,45 +44,88 @@ func (d *Decoder) Decode(v any) error {
 	return d.unmarshal(doc, val, nil)
 }
 
-func (d *Decoder) unmarshal(doc *html.Node, v reflect.Value, texts []string) error {
-	v, u := dereference(v)
+func (d *Decoder) unmarshal(doc *html.Node, v reflect.Value, xtag *xpathTag) error {
+	var (
+		text  string
+		texts []string
+		err   error
+	)
 
-	// Skip if no text is provided to non-struct fields.
-	if len(texts) == 0 && v.Kind() != reflect.Struct {
-		return nil
+	if xtag != nil {
+		texts, err = xtag.Search(doc)
+		if err != nil {
+			return err
+		}
+		if len(texts) > 0 {
+			text = texts[0]
+		}
 	}
 
-	// If the type implements Unmarshaler, call user-defined unmarshaling method.
+	v0, u := dereference(v)
 	if u != nil {
-		return u.UnmarshalXPath([]byte(texts[0]))
+		return u.UnmarshalXPath([]byte(text))
 	}
 
+	switch v0.Kind() {
+	case reflect.Struct:
+		return d.unmarshalStruct(doc, v0)
+	case reflect.Slice:
+		if len(texts) == 0 {
+			return nil
+		}
+		return d.unmarshalSlice(doc, v0, texts)
+	default:
+		return d.unmarshalValue(doc, v0, text)
+	}
+}
+
+func (d *Decoder) unmarshalStruct(doc *html.Node, v reflect.Value) error {
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		var (
+			xtag *xpathTag
+		)
+		tag := t.Field(i).Tag.Get(d.tagName)
+		if tag != "" {
+			xtag = newXpathTag(tag)
+		}
+		// Skip if no tag is provided to non-struct fields.
+		if tag == "" && v.Kind() != reflect.Struct {
+			return nil
+		}
+
+		err := d.unmarshal(doc, v.Field(i), xtag)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *Decoder) unmarshalValue(doc *html.Node, v reflect.Value, text string) error {
 	switch v.Kind() {
 	case reflect.String:
-		v.SetString(texts[0])
-	case reflect.Struct:
-		t := v.Type()
-		for i := 0; i < t.NumField(); i++ {
-			tag := t.Field(i).Tag.Get(d.tagName)
-
-			var texts0 []string
-			if tag != "" {
-				xtag := newXpathTag(tag)
-
-				texts0, err = xtag.Search(doc)
-				if err != nil {
-					return err
-				}
-			}
-
-			err := d.unmarshal(doc, v.Field(i), texts0)
-			if err != nil {
-				return err
-			}
-		}
+		v.SetString(text)
 	default:
 		return fmt.Errorf("unsupported type. type=%s", v.Type())
 	}
+
+	return nil
+}
+
+func (d *Decoder) unmarshalSlice(doc *html.Node, v reflect.Value, ss []string) error {
+	v0 := reflect.MakeSlice(v.Type(), len(ss), len(ss))
+
+	for i, s := range ss {
+		e := v0.Index(i)
+		err := d.unmarshalValue(doc, e, s)
+		if err != nil {
+			return err
+		}
+	}
+
+	v.Set(v0)
 
 	return nil
 }
