@@ -49,7 +49,7 @@ func (d *Decoder) Decode(v any) error {
 func (d *Decoder) unmarshal(ctx *searchContext, v reflect.Value, xpath string) error {
 	v0, u := dereference(v)
 	if u != nil {
-		s, err := ctx.Text("")
+		s, err := ctx.Text(xpath)
 		if err != nil {
 			return err
 		}
