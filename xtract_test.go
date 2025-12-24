@@ -6,8 +6,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/net/html"
 )
 
 func TestDecode(t *testing.T) {
@@ -67,13 +65,19 @@ func (t *customTime) UnmarshalXPath(data []byte) (err error) {
 
 func TestUnmarshal(t *testing.T) {
 	type result struct {
-		Field string `xpath:"//span"`
+		Field string `xpath:"//."`
 	}
 	type invalidTag struct {
-		Field string `xpath:"//a[id=']/span"`
+		Field string `xpath:"/*//a[id=']/span"`
 	}
 	type notFound struct {
-		Field string `xpath:"//span[@class=\"notfound\"]"`
+		Field string `xpath:"/*//span[@class=\"notfound\"]"`
+	}
+	type sliceOfStruct struct {
+		Field []result `xpath:"//div[@id=\"1\"]/span"`
+	}
+	type nestedStruct struct {
+		Field result `xpath:"//div[@id=\"1\"]"`
 	}
 
 	tests := []struct {
@@ -98,6 +102,27 @@ func TestUnmarshal(t *testing.T) {
 		{"slice empty", []string(nil), nil, []string(nil), false},
 		{"slice 1", []string{}, []string{"foo"}, []string{"foo"}, false},
 		{"slice N", []string{}, []string{"foo", "bar"}, []string{"foo", "bar"}, false},
+		{
+			"slice of struct",
+			sliceOfStruct{},
+			[]string{`<div id="1"><span>foo</span><span>bar</span></div><div id="2"><span>baz</span></div>`},
+			sliceOfStruct{
+				[]result{
+					{"foo"},
+					{"bar"},
+				},
+			},
+			false,
+		},
+		{
+			"nested struct",
+			nestedStruct{},
+			[]string{`<div id="1"><span>foo</span></div><div id="2"><span>bar</span></div>`},
+			nestedStruct{
+				result{"foo"},
+			},
+			false,
+		},
 
 		// Unmarshaler
 		{"unmarshaler", customTime{}, []string{"1970-01-01 00:00:00"}, customTime{time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)}, false},
@@ -119,12 +144,9 @@ func TestUnmarshal(t *testing.T) {
 			for _, text := range tt.texts {
 				htmlLines = append(htmlLines, fmt.Sprintf("<span>%s</span>", text))
 			}
-			doc, err := html.Parse(strings.NewReader(strings.Join(htmlLines, "\n")))
-			if err != nil {
-				t.Fatal(err)
-			}
+			r := strings.NewReader(strings.Join(htmlLines, "\n"))
 
-			err = NewDecoder(nil).unmarshal(doc, v, nil)
+			err := NewDecoder(r).Decode(v.Addr().Interface())
 			if tt.wantErr == (err == nil) {
 				t.Errorf("unexpected error status: %v", err)
 				return
