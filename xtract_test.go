@@ -64,68 +64,94 @@ func (t *customTime) UnmarshalXPath(data []byte) (err error) {
 }
 
 func TestUnmarshal(t *testing.T) {
+	doc := `
+	<div class="container">
+		<span id="text">foo</span>
+		<span id="time">1970-01-01 00:00:00</span>
+		<ul>
+			<li>item1</li>
+			<li>item2</li>
+			<li>item3</li>
+		</ul>
+		<table>
+			<tbody>
+				<tr>
+					<td class="name">John Jackson</td>
+					<td class="email">john@example.com</td>
+				</tr>
+				<tr>
+					<td class="name">Mike Miller</td>
+					<td class="email">mike@example.com</td>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+	`
+
 	type result struct {
-		Field string `xpath:"//."`
+		Field string `xpath:"//*[@id='text']"`
 	}
-	type invalidTag struct {
-		Field string `xpath:"/*//a[id=']/span"`
-	}
-	type notFound struct {
-		Field string `xpath:"/*//span[@class=\"notfound\"]"`
-	}
-	type sliceOfStruct struct {
-		Field []result `xpath:"//div[@id=\"1\"]/span"`
+	type user struct {
+		Name  string `xpath:"//td[@class='name']"`
+		Email string `xpath:"//td[@class='email']"`
 	}
 	type nestedStruct struct {
-		Field result `xpath:"//div[@id=\"1\"]"`
+		User user `xpath:"//table/tbody/tr[1]"`
 	}
 
 	tests := []struct {
 		name    string
-		input   any
-		texts   []string
+		xpath   string
+		value   any
 		want    any
 		wantErr bool
 	}{
 		// Handling the invalid tag
-		{"invalid tag", invalidTag{}, []string{"text"}, "", true},
-		{"notfound", notFound{}, []string{"text"}, notFound{}, false},
+		{"invalid tag", "/*//a[id=']/span", "", "", true},
+		{"notfound", "/*//span[@class='notfound']", "", "", false},
 
 		// Nothing should be done with empty text
-		{"allow empty", "", []string{""}, "", false},
+		{"allow empty", "", "", "", false},
 
 		// Types
-		{"string", "", []string{"foo"}, "foo", false},
-		{"string pointer", new(string), []string{"foo"}, "foo", false},
-		{"struct", result{}, []string{"foo"}, result{"foo"}, false},
-		{"struct pointer", &result{}, []string{"foo"}, result{"foo"}, false},
-		{"slice empty", []string(nil), nil, []string(nil), false},
-		{"slice 1", []string{}, []string{"foo"}, []string{"foo"}, false},
-		{"slice N", []string{}, []string{"foo", "bar"}, []string{"foo", "bar"}, false},
+		{"string", "//*[@id='text']", "", "foo", false},
+		{"string pointer", "//*[@id='text']", new(string), "foo", false},
+		{"struct", ".", result{}, result{"foo"}, false},
+		{"struct pointer", ".", &result{}, result{"foo"}, false},
+		{"slice empty", "//notfound", []string(nil), []string(nil), false},
+		{"slice 1", "//ul/li[position() = 1]", []string{}, []string{"item1"}, false},
+		{"slice N", "//ul/li", []string{}, []string{"item1", "item2", "item3"}, false},
 		{
-			"slice of struct",
-			sliceOfStruct{},
-			[]string{`<div id="1"><span>foo</span><span>bar</span></div><div id="2"><span>baz</span></div>`},
-			sliceOfStruct{
-				[]result{
-					{"foo"},
-					{"bar"},
+			"nested struct",
+			".",
+			nestedStruct{},
+			nestedStruct{
+				User: user{
+					Name:  "John Jackson",
+					Email: "john@example.com",
 				},
 			},
 			false,
 		},
 		{
-			"nested struct",
-			nestedStruct{},
-			[]string{`<div id="1"><span>foo</span></div><div id="2"><span>bar</span></div>`},
-			nestedStruct{
-				result{"foo"},
+			"slice of struct",
+			"//table//tr",
+			[]user{},
+			[]user{
+				{
+					Name:  "John Jackson",
+					Email: "john@example.com",
+				},
+				{
+					Name:  "Mike Miller",
+					Email: "mike@example.com",
+				},
 			},
 			false,
 		},
 
 		// Unmarshaler
-		{"unmarshaler", customTime{}, []string{"1970-01-01 00:00:00"}, customTime{time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)}, false},
+		{"unmarshaler", "//span[@id='time']", customTime{}, customTime{time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)}, false},
 	}
 
 	for _, tt := range tests {
@@ -133,19 +159,16 @@ func TestUnmarshal(t *testing.T) {
 			// Make a struct with the specified tag to test behavior with tag.
 			sf := reflect.StructField{
 				Name: "TestField",
-				Type: reflect.TypeOf(tt.input),
-				Tag:  reflect.StructTag(`xpath:"//span"`),
+				Type: reflect.TypeOf(tt.value),
+				Tag:  reflect.StructTag(fmt.Sprintf(`xpath:"%s"`, tt.xpath)),
 			}
 			st := reflect.StructOf([]reflect.StructField{sf})
 			v := reflect.New(st).Elem()
 
-			// Generate document for testing
-			var htmlLines []string
-			for _, text := range tt.texts {
-				htmlLines = append(htmlLines, fmt.Sprintf("<span>%s</span>", text))
-			}
-			r := strings.NewReader(strings.Join(htmlLines, "\n"))
+			// Make a document reader
+			r := strings.NewReader(doc)
 
+			// Decode
 			err := NewDecoder(r).Decode(v.Addr().Interface())
 			if tt.wantErr == (err == nil) {
 				t.Errorf("unexpected error status: %v", err)
