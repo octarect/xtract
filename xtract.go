@@ -89,7 +89,7 @@ func (d *Decoder) unmarshalStruct(ctx *searchContext, v reflect.Value, xpath str
 			}
 		} else {
 			// Skip if no tag is provided to non-struct fields
-			if v.Kind() != reflect.Struct {
+			if v.Field(i).Kind() != reflect.Struct {
 				return nil
 			}
 

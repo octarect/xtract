@@ -91,6 +91,9 @@ func TestUnmarshal(t *testing.T) {
 	type result struct {
 		Field string `xpath:"//*[@id='text']"`
 	}
+	type untagged struct {
+		Field string
+	}
 	type user struct {
 		Name  string `xpath:"//td[@class='name']"`
 		Email string `xpath:"//td[@class='email']"`
@@ -112,6 +115,8 @@ func TestUnmarshal(t *testing.T) {
 
 		// Nothing should be done with empty text
 		{"allow empty", "", "", "", false},
+		// Skip Untagged fields
+		{"untagged field", "", untagged{}, untagged{}, false},
 
 		// Types
 		{"string", "//*[@id='text']", "", "foo", false},
