@@ -69,9 +69,9 @@ func TestUnmarshal(t *testing.T) {
 		<span id="text">foo</span>
 		<span id="time">1970-01-01 00:00:00</span>
 		<ul>
-			<li>item1</li>
-			<li>item2</li>
-			<li>item3</li>
+			<li data-key="key1">item1</li>
+			<li data-key="key2">item2</li>
+			<li data-key="key3">item3</li>
 		</ul>
 		<table>
 			<tbody>
@@ -151,6 +151,23 @@ func TestUnmarshal(t *testing.T) {
 					Name:  "Mike Miller",
 					Email: "mike@example.com",
 				},
+			},
+			false,
+		},
+		{
+			"map",
+			"//ul/li/@data-key;//ul/li",
+			map[string]string{},
+			map[string]string{"key1": "item1", "key2": "item2", "key3": "item3"},
+			false,
+		},
+		{
+			"map of struct",
+			"//table//tr/td[@class='name'];//table//tr",
+			map[string]user{},
+			map[string]user{
+				"John Jackson": {"John Jackson", "john@example.com"},
+				"Mike Miller":  {"Mike Miller", "mike@example.com"},
 			},
 			false,
 		},

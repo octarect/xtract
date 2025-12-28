@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 
 	"golang.org/x/net/html"
 )
@@ -59,6 +60,14 @@ func (d *Decoder) unmarshal(ctx *searchContext, v reflect.Value, xpath string) e
 	switch v0.Kind() {
 	case reflect.Struct:
 		return d.unmarshalStruct(ctx, v0, xpath)
+	case reflect.Map:
+		parts := strings.Split(xpath, ";")
+		if len(parts) != 2 {
+			return fmt.Errorf(`invalid xpath for map. expected format 'xpath:"<key_xpath>;<value_xpath>"'`)
+		}
+		keyXpath := strings.TrimSpace(parts[0])
+		valueXpath := strings.TrimSpace(parts[1])
+		return d.unmarshalMap(ctx, v0, keyXpath, valueXpath)
 	case reflect.Slice:
 		return d.unmarshalSlice(ctx, v0, xpath)
 	default:
@@ -122,6 +131,44 @@ func (d *Decoder) unmarshalSlice(ctx *searchContext, v reflect.Value, xpath stri
 	}
 
 	v.Set(v0)
+
+	return nil
+}
+
+func (d *Decoder) unmarshalMap(ctx *searchContext, v reflect.Value, keyXpath, valueXpath string) error {
+	kctxs, err := ctx.Search(keyXpath)
+	if err != nil {
+		return fmt.Errorf("invalid xpath for map keys. error=%v", err)
+	}
+
+	vctxs, err := ctx.Search(valueXpath)
+	if err != nil {
+		return fmt.Errorf("invalid xpath for map values. error=%v", err)
+	}
+
+	n := min(len(kctxs), len(vctxs))
+	m := reflect.MakeMapWithSize(v.Type(), n)
+
+	kt := v.Type().Key()
+	vt := v.Type().Elem()
+
+	for i := range n {
+		kv := reflect.New(kt)
+		err = d.unmarshal(kctxs[i], kv, "")
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal map key. error=%v", err)
+		}
+
+		vv := reflect.New(vt)
+		err = d.unmarshal(vctxs[i], vv, "")
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal map value. error=%v", err)
+		}
+
+		m.SetMapIndex(kv.Elem(), vv.Elem())
+	}
+
+	v.Set(m)
 
 	return nil
 }
