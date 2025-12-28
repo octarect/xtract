@@ -1,6 +1,7 @@
 package xtract
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,10 @@ import (
 
 	"golang.org/x/net/html"
 )
+
+func Unmarshal(data []byte, v any) error {
+	return NewDecoder(bytes.NewReader(data)).Decode(v)
+}
 
 type Unmarshaler interface {
 	UnmarshalXPath([]byte) error

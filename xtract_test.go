@@ -187,11 +187,7 @@ func TestUnmarshal(t *testing.T) {
 			st := reflect.StructOf([]reflect.StructField{sf})
 			v := reflect.New(st).Elem()
 
-			// Make a document reader
-			r := strings.NewReader(doc)
-
-			// Decode
-			err := NewDecoder(r).Decode(v.Addr().Interface())
+			err := Unmarshal([]byte(doc), v.Addr().Interface())
 			if tt.wantErr == (err == nil) {
 				t.Errorf("unexpected error status: %v", err)
 				return
