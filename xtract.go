@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -187,6 +188,12 @@ func (d *Decoder) unmarshalValue(ctx *searchContext, v reflect.Value, xpath stri
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(s)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		n, err := strconv.ParseInt(s, 0, v.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("invalid format of int. error=%v", err)
+		}
+		v.SetInt(n)
 	default:
 		return fmt.Errorf("unsupported type. type=%s", v.Type())
 	}

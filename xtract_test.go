@@ -67,6 +67,12 @@ func TestUnmarshal(t *testing.T) {
 	doc := `
 	<div class="container">
 		<span id="text">foo</span>
+		<span id="int-value">127</span>
+		<span id="int8-value">127</span>
+		<span id="int16-value">32767</span>
+		<span id="int32-value">2147483647</span>
+		<span id="int64-value">9223372036854775807</span>
+		<span id="negative-int">-123</span>
 		<span id="time">1970-01-01 00:00:00</span>
 		<ul>
 			<li data-key="key1">item1</li>
@@ -121,6 +127,15 @@ func TestUnmarshal(t *testing.T) {
 		// Types
 		{"string", "//*[@id='text']", "", "foo", false},
 		{"string pointer", "//*[@id='text']", new(string), "foo", false},
+		{"int", "//*[@id='int-value']", 0, 127, false},
+		{"int pointer", "//*[@id='int-value']", new(int), 127, false},
+		{"int negative", "//*[@id='negative-int']", 0, -123, false},
+		{"int overflow", "//*[@id='int64-value']", int8(0), nil, true},
+		{"int invalid", "//*[@id='text']", int8(0), nil, true},
+		{"int8", "//*[@id='int8-value']", int8(0), int8(127), false},
+		{"int16", "//*[@id='int16-value']", int16(0), int16(32767), false},
+		{"int32", "//*[@id='int32-value']", int32(0), int32(2147483647), false},
+		{"int64", "//*[@id='int64-value']", int64(0), int64(9223372036854775807), false},
 		{"struct", ".", result{}, result{"foo"}, false},
 		{"struct pointer", ".", &result{}, result{"foo"}, false},
 		{"slice empty", "//notfound", []string(nil), []string(nil), false},
@@ -196,6 +211,7 @@ func TestUnmarshal(t *testing.T) {
 				return
 			}
 
+			// Get a field value which you actually want to test
 			v0 := v.Field(0)
 
 			var got any
