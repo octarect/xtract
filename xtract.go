@@ -200,6 +200,12 @@ func (d *Decoder) unmarshalValue(ctx *searchContext, v reflect.Value, xpath stri
 			return fmt.Errorf("invalid format of uint. error=%v", err)
 		}
 		v.SetUint(n)
+	case reflect.Float32, reflect.Float64:
+		n, err := strconv.ParseFloat(s, v.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("invalid format of float. error=%v", err)
+		}
+		v.SetFloat(n)
 	default:
 		return fmt.Errorf("unsupported type. type=%s", v.Type())
 	}

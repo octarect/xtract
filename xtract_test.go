@@ -77,7 +77,10 @@ func TestUnmarshal(t *testing.T) {
 		<span id="uint16-value">65535</span>
 		<span id="uint32-value">4294967295</span>
 		<span id="uint64-value">18446744073709551615</span>
+		<span id="float32-value">3.14159</span>
+		<span id="float64-value">3.141592653589793</span>
 		<span id="negative-int">-123</span>
+		<span id="negative-float64">-2.718281828459045</span>
 		<span id="time">1970-01-01 00:00:00</span>
 		<ul>
 			<li data-key="key1">item1</li>
@@ -149,6 +152,12 @@ func TestUnmarshal(t *testing.T) {
 		{"uint16", "//*[@id='uint16-value']", uint16(0), uint16(65535), false},
 		{"uint32", "//*[@id='uint32-value']", uint32(0), uint32(4294967295), false},
 		{"uint64", "//*[@id='uint64-value']", uint64(0), uint64(18446744073709551615), false},
+		{"float32", "//*[@id='float32-value']", float32(0.0), float32(3.14159), false},
+		{"float32 pointer", "//*[@id='float32-value']", new(float32), float32(3.14159), false},
+		{"float32 overflow", "//*[@id='float64-value']", float32(0.0), float32(3.1415927), false},
+		{"float32 invalid", "//*[@id='text']", float32(0.0), nil, true},
+		{"float64", "//*[@id='float64-value']", float64(0.0), float64(3.141592653589793), false},
+		{"float64 negative", "//*[@id='negative-float64']", float64(0.0), float64(-2.718281828459045), false},
 		{"struct", ".", result{}, result{"foo"}, false},
 		{"struct pointer", ".", &result{}, result{"foo"}, false},
 		{"slice empty", "//notfound", []string(nil), []string(nil), false},
