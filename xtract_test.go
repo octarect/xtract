@@ -115,6 +115,7 @@ func TestUnmarshal(t *testing.T) {
 	type nestedStruct struct {
 		User user `xpath:"//table/tbody/tr[1]"`
 	}
+	var anyValue any
 
 	tests := []struct {
 		name    string
@@ -158,6 +159,7 @@ func TestUnmarshal(t *testing.T) {
 		{"float32 invalid", "//*[@id='text']", float32(0.0), nil, true},
 		{"float64", "//*[@id='float64-value']", float64(0.0), float64(3.141592653589793), false},
 		{"float64 negative", "//*[@id='negative-float64']", float64(0.0), float64(-2.718281828459045), false},
+		{"any", "//*[@id='text']", &anyValue, "foo", false},
 		{"struct", ".", result{}, result{"foo"}, false},
 		{"struct pointer", ".", &result{}, result{"foo"}, false},
 		{"slice empty", "//notfound", []string(nil), []string(nil), false},

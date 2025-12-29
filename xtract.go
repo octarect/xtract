@@ -206,6 +206,9 @@ func (d *Decoder) unmarshalValue(ctx *searchContext, v reflect.Value, xpath stri
 			return fmt.Errorf("invalid format of float. error=%v", err)
 		}
 		v.SetFloat(n)
+	case reflect.Interface:
+		v0 := reflect.ValueOf(s)
+		v.Set(v0)
 	default:
 		return fmt.Errorf("unsupported type. type=%s", v.Type())
 	}
