@@ -72,6 +72,11 @@ func TestUnmarshal(t *testing.T) {
 		<span id="int16-value">32767</span>
 		<span id="int32-value">2147483647</span>
 		<span id="int64-value">9223372036854775807</span>
+		<span id="uint-value">255</span>
+		<span id="uint8-value">255</span>
+		<span id="uint16-value">65535</span>
+		<span id="uint32-value">4294967295</span>
+		<span id="uint64-value">18446744073709551615</span>
 		<span id="negative-int">-123</span>
 		<span id="time">1970-01-01 00:00:00</span>
 		<ul>
@@ -136,6 +141,14 @@ func TestUnmarshal(t *testing.T) {
 		{"int16", "//*[@id='int16-value']", int16(0), int16(32767), false},
 		{"int32", "//*[@id='int32-value']", int32(0), int32(2147483647), false},
 		{"int64", "//*[@id='int64-value']", int64(0), int64(9223372036854775807), false},
+		{"uint", "//*[@id='uint-value']", uint(0), uint(255), false},
+		{"uint pointer", "//*[@id='uint-value']", new(uint), uint(255), false},
+		{"uint overflow", "//*[@id='uint64-value']", uint8(0), nil, true},
+		{"uint invalid", "//*[@id='text']", uint8(0), nil, true},
+		{"uint8", "//*[@id='uint8-value']", uint8(0), uint8(255), false},
+		{"uint16", "//*[@id='uint16-value']", uint16(0), uint16(65535), false},
+		{"uint32", "//*[@id='uint32-value']", uint32(0), uint32(4294967295), false},
+		{"uint64", "//*[@id='uint64-value']", uint64(0), uint64(18446744073709551615), false},
 		{"struct", ".", result{}, result{"foo"}, false},
 		{"struct pointer", ".", &result{}, result{"foo"}, false},
 		{"slice empty", "//notfound", []string(nil), []string(nil), false},
