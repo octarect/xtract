@@ -1,7 +1,6 @@
 package xtract
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -122,7 +121,6 @@ func TestXpathTagText(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := sc.Text(tt.xpath)
 			if !reflect.DeepEqual(got, tt.want) {
-				fmt.Printf("%#v\n", got)
 				t.Errorf("SearchContext.Text() = %v, want %v", got, tt.want)
 			}
 			if tt.wantErr != (err != nil) {
