@@ -1,6 +1,7 @@
 # xtract
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/octarect/xtract.svg)](https://pkg.go.dev/github.com/octarect/xtract)
+[![Go Report Card](https://goreportcard.com/badge/github.com/octarect/xtract)](https://goreportcard.com/report/github.com/octarect/xtract)
 
 A Go library for extracting data from HTML/XML documents into structs using XPath expressions via struct tags.
 
