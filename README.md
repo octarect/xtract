@@ -171,6 +171,21 @@ type ProductListMap struct {
 }
 ```
 
+#### Byte Slice
+
+> Please use `string` if you want to handle a human-readable text.
+
+A field of type `[]byte` expects a base64-encoded string and decodes it into raw bytes in the case of a single node; otherwise, it decodes ascii values from multiple nodes.
+
+```html
+<span class="base64" data-decoded="Hello World">SGVsbG8gV29ybGQK</span>
+<div class="ascii" data-decoded="foo">
+  <div>102</div>
+  <div>111</div>
+  <div>111</div>
+</div>
+```
+
 ### Custom Unmarshaler
 
 It is useful to implement xtract.Unmarshaler interface on your types when you need to handle complex parsing logic.
