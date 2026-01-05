@@ -66,7 +66,7 @@ func (t *customTime) UnmarshalXPath(data []byte) (err error) {
 func TestUnmarshal(t *testing.T) {
 	doc := `
 	<div class="container">
-		<span id="text">foo</span>
+		<span id="text" data-base64="Zm9v">foo</span>
 		<span id="int-value">127</span>
 		<span id="int8-value">127</span>
 		<span id="int16-value">32767</span>
@@ -82,10 +82,15 @@ func TestUnmarshal(t *testing.T) {
 		<span id="negative-int">-123</span>
 		<span id="negative-float64">-2.718281828459045</span>
 		<span id="time">1970-01-01 00:00:00</span>
-		<ul>
+		<ul id="slice">
 			<li data-key="key1">item1</li>
 			<li data-key="key2">item2</li>
 			<li data-key="key3">item3</li>
+		</ul>
+		<ul id="byte-slice">
+			<li>98</li>
+			<li>97</li>
+			<li>114</li>
 		</ul>
 		<table>
 			<tbody>
@@ -163,8 +168,10 @@ func TestUnmarshal(t *testing.T) {
 		{"struct", ".", result{}, result{"foo"}, false},
 		{"struct pointer", ".", &result{}, result{"foo"}, false},
 		{"slice empty", "//notfound", []string(nil), []string(nil), false},
-		{"slice 1", "//ul/li[position() = 1]", []string{}, []string{"item1"}, false},
-		{"slice N", "//ul/li", []string{}, []string{"item1", "item2", "item3"}, false},
+		{"slice 1", "//ul[@id='slice']/li[position() = 1]", []string{}, []string{"item1"}, false},
+		{"slice N", "//ul[@id='slice']/li", []string{}, []string{"item1", "item2", "item3"}, false},
+		{"byte slice", "//*[@id='text']/@data-base64", []byte{}, []byte("foo"), false},
+		{"byte slice raw", "//*[@id='byte-slice']/li", []byte{}, []byte("bar"), false},
 		{
 			"nested struct",
 			".",

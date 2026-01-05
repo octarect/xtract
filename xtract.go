@@ -2,6 +2,7 @@ package xtract
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -75,6 +76,9 @@ func (d *Decoder) unmarshal(ctx *searchContext, v reflect.Value, xpath string) e
 		valueXpath := strings.TrimSpace(parts[1])
 		return d.unmarshalMap(ctx, v0, keyXpath, valueXpath)
 	case reflect.Slice:
+		if v0.Type() == reflect.TypeOf([]byte{}) {
+			return d.unmarshalByteSlice(ctx, v0, xpath)
+		}
 		return d.unmarshalSlice(ctx, v0, xpath)
 	default:
 		return d.unmarshalValue(ctx, v0, xpath)
@@ -137,6 +141,42 @@ func (d *Decoder) unmarshalSlice(ctx *searchContext, v reflect.Value, xpath stri
 	}
 
 	v.Set(v0)
+
+	return nil
+}
+
+// Unmarshal a byte slice ([]byte/[]uint8).
+// If only one node is specified by xpath, decode it as a base64 string;
+// otherwise, treat it as a slice of ascii codes.
+func (d *Decoder) unmarshalByteSlice(ctx *searchContext, v reflect.Value, xpath string) error {
+	// Ensure the type is []byte/[]uint8
+	if v.Type() != reflect.TypeOf([]byte{}) {
+		return fmt.Errorf("expected []byte type, got %s", v.Type())
+	}
+
+	ctxs, err := ctx.Search(xpath)
+	if err != nil {
+		return err
+	}
+	if len(ctxs) == 0 {
+		return nil
+	}
+
+	// Decode as base64 string if a single node is found
+	if len(ctxs) == 1 {
+		b64Str, err := ctxs[0].Text("")
+		if err != nil {
+			return err
+		}
+		b64Bytes, err := base64.StdEncoding.DecodeString(b64Str)
+		if err != nil {
+			return err
+		}
+		v.SetBytes(b64Bytes)
+	} else {
+		// Delegate to unmarshalSlice to handle slice of ascii codes
+		return d.unmarshalSlice(ctx, v, xpath)
+	}
 
 	return nil
 }
