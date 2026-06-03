@@ -224,6 +224,9 @@ func (d *Decoder) unmarshalValue(ctx *searchContext, v reflect.Value, xpath stri
 	if err != nil {
 		return fmt.Errorf("invalid xpath. error=%v", err)
 	}
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
 
 	switch v.Kind() {
 	case reflect.String:

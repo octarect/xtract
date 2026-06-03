@@ -67,6 +67,7 @@ func TestUnmarshal(t *testing.T) {
 	doc := `
 	<div class="container">
 		<span id="text" data-base64="Zm9v">foo</span>
+		<span id="empty"></span>
 		<span id="int">127</span>
 		<span id="int-bin">0b01111111</span>
 		<span id="int-hex">0x7f</span>
@@ -152,6 +153,7 @@ func TestUnmarshal(t *testing.T) {
 		{"int negative", "//*[@id='negative-int']", 0, -123, false},
 		{"int overflow", "//*[@id='int64']", int8(0), nil, true},
 		{"int invalid", "//*[@id='text']", int8(0), nil, true},
+		{"int empty", "//*[@id='empty']", int8(1), int8(1), false},
 		{"int8", "//*[@id='int8']", int8(0), int8(127), false},
 		{"int16", "//*[@id='int16']", int16(0), int16(32767), false},
 		{"int32", "//*[@id='int32']", int32(0), int32(2147483647), false},
@@ -162,6 +164,7 @@ func TestUnmarshal(t *testing.T) {
 		{"uint pointer", "//*[@id='uint']", new(uint), uint(255), false},
 		{"uint overflow", "//*[@id='uint64']", uint8(0), nil, true},
 		{"uint invalid", "//*[@id='text']", uint8(0), nil, true},
+		{"uint empty", "//*[@id='empty']", uint8(1), uint8(1), false},
 		{"uint8", "//*[@id='uint8']", uint8(0), uint8(255), false},
 		{"uint16", "//*[@id='uint16']", uint16(0), uint16(65535), false},
 		{"uint32", "//*[@id='uint32']", uint32(0), uint32(4294967295), false},
@@ -170,7 +173,9 @@ func TestUnmarshal(t *testing.T) {
 		{"float32 pointer", "//*[@id='float32']", new(float32), float32(3.14159), false},
 		{"float32 overflow", "//*[@id='float64']", float32(0.0), float32(3.1415927), false},
 		{"float32 invalid", "//*[@id='text']", float32(0.0), nil, true},
+		{"float32 empty", "//*[@id='empty']", float32(1.0), float32(1.0), false},
 		{"float64", "//*[@id='float64']", float64(0.0), float64(3.141592653589793), false},
+		{"float64 empty", "//*[@id='empty']", float64(1.0), float64(1.0), false},
 		{"float64 negative", "//*[@id='negative-float64']", float64(0.0), float64(-2.718281828459045), false},
 		{"any", "//*[@id='text']", &anyValue, "foo", false},
 		{"struct", ".", result{}, result{"foo"}, false},
@@ -240,6 +245,9 @@ func TestUnmarshal(t *testing.T) {
 			}
 			st := reflect.StructOf([]reflect.StructField{sf})
 			v := reflect.New(st).Elem()
+			
+			// Set the field value to the specified initial value
+			v.Field(0).Set(reflect.ValueOf(tt.value))
 
 			err := Unmarshal([]byte(doc), v.Addr().Interface())
 			if tt.wantErr == (err == nil) {
