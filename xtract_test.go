@@ -54,6 +54,13 @@ func TestDecodeInvalidDocument(t *testing.T) {
 	}
 }
 
+type invalidCustomTime struct{}
+
+func (t *invalidCustomTime) UnmarshalXPath(data []byte) error {
+	_, err := time.Parse("2006-01-02 15:04:05", string(data))
+	return err
+}
+
 type customTime struct {
 	time.Time
 }
@@ -264,6 +271,107 @@ func TestUnmarshal(t *testing.T) {
 				t.Errorf("expected %+v (%T), got %+v (%T)", tt.want, tt.want, got, got)
 			}
 		})
+	}
+}
+
+func TestUnmarshalErrorIncludesHTMLLine(t *testing.T) {
+	doc := `<div>
+  <span id="text">foo</span>
+  <span id="time">not-a-time</span>
+  <span id="base64" data-value="not-base64">payload</span>
+</div>`
+
+	tests := []struct {
+		name      string
+		input     any
+		wantParts []string
+	}{
+		{
+			name: "int parse error",
+			input: &struct {
+				Field int `xpath:"//*[@id='text']"`
+			}{},
+			wantParts: []string{
+				`invalid format of int. error=strconv.ParseInt: parsing "foo": invalid syntax`,
+				`html line 2:`,
+				`> 2 |   <span id="text">foo</span>`,
+				`  1 | <div>`,
+				`  3 |   <span id="time">not-a-time</span>`,
+				`  4 |   <span id="base64" data-value="not-base64">payload</span>`,
+			},
+		},
+		{
+			name: "custom unmarshaler error",
+			input: &struct {
+				Field invalidCustomTime `xpath:"//*[@id='time']"`
+			}{},
+			wantParts: []string{
+				`cannot parse "not-a-time" as "2006"`,
+				`html line 3:`,
+				`  1 | <div>`,
+				`  2 |   <span id="text">foo</span>`,
+				`> 3 |   <span id="time">not-a-time</span>`,
+				`  4 |   <span id="base64" data-value="not-base64">payload</span>`,
+				`  5 | </div>`,
+			},
+		},
+		{
+			name: "attribute base64 error",
+			input: &struct {
+				Field []byte `xpath:"//*[@id='base64']/@data-value"`
+			}{},
+			wantParts: []string{
+				`illegal base64 data at input byte 3`,
+				`html line 4:`,
+				`  2 |   <span id="text">foo</span>`,
+				`  3 |   <span id="time">not-a-time</span>`,
+				`> 4 |   <span id="base64" data-value="not-base64">payload</span>`,
+				`  5 | </div>`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Unmarshal([]byte(doc), tt.input)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+
+			for _, wantPart := range tt.wantParts {
+				if !strings.Contains(err.Error(), wantPart) {
+					t.Fatalf("expected error %q to contain %q", err.Error(), wantPart)
+				}
+			}
+		})
+	}
+}
+
+func TestUnmarshalErrorFormatsAlignedContext(t *testing.T) {
+	err := (&UnmarshalError{
+		Err:        fmt.Errorf("boom"),
+		LineNumber: 10,
+		Context: []SourceLine{
+			{Number: 8, Text: ""},
+			{Number: 9, Text: "          xxx"},
+			{Number: 10, Text: "         <li data-key=\"int\">-123</li>"},
+			{Number: 11, Text: "         <li data-key=\"uint\">123</li>"},
+			{Number: 12, Text: "         <li data-key=\"float\">1.23</li>"},
+		},
+	}).Error()
+
+	wantParts := []string{
+		"  8 | ",
+		"  9 |           xxx",
+		"> 10 |          <li data-key=\"int\">-123</li>",
+		" 11 |          <li data-key=\"uint\">123</li>",
+		" 12 |          <li data-key=\"float\">1.23</li>",
+	}
+
+	for _, wantPart := range wantParts {
+		if !strings.Contains(err, wantPart) {
+			t.Fatalf("expected error %q to contain %q", err, wantPart)
+		}
 	}
 }
 

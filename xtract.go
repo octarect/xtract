@@ -24,6 +24,7 @@ type Unmarshaler interface {
 type Decoder struct {
 	r       io.Reader
 	doc     *html.Node
+	locator *sourceLocator
 	tagName string
 }
 
@@ -45,11 +46,16 @@ func (d *Decoder) Decode(v any) error {
 		return errors.New("nil pointer passed to Unmarshal")
 	}
 
-	var err error
-	d.doc, err = html.Parse(d.r)
+	data, err := io.ReadAll(d.r)
 	if err != nil {
 		return fmt.Errorf("failed to parse document: %v", err)
 	}
+
+	d.doc, err = html.Parse(bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to parse document: %v", err)
+	}
+	d.locator = newSourceLocator(data, d.doc)
 
 	return d.unmarshal(newSearchContext(d.doc), val, "")
 }
@@ -57,11 +63,14 @@ func (d *Decoder) Decode(v any) error {
 func (d *Decoder) unmarshal(ctx *searchContext, v reflect.Value, xpath string) error {
 	v0, u := dereference(v)
 	if u != nil {
-		s, err := ctx.Text(xpath)
+		s, node, err := ctx.TextNode(xpath)
 		if err != nil {
 			return err
 		}
-		return u.UnmarshalXPath([]byte(s))
+		if err := u.UnmarshalXPath([]byte(s)); err != nil {
+			return d.wrapError(err, node)
+		}
+		return nil
 	}
 
 	switch v0.Kind() {
@@ -170,7 +179,7 @@ func (d *Decoder) unmarshalByteSlice(ctx *searchContext, v reflect.Value, xpath 
 		}
 		b64Bytes, err := base64.StdEncoding.DecodeString(b64Str)
 		if err != nil {
-			return err
+			return d.wrapError(err, ctxs[0].source)
 		}
 		v.SetBytes(b64Bytes)
 	} else {
@@ -220,7 +229,7 @@ func (d *Decoder) unmarshalMap(ctx *searchContext, v reflect.Value, keyXpath, va
 }
 
 func (d *Decoder) unmarshalValue(ctx *searchContext, v reflect.Value, xpath string) error {
-	s, err := ctx.Text(xpath)
+	s, node, err := ctx.TextNode(xpath)
 	if err != nil {
 		return fmt.Errorf("invalid xpath. error=%v", err)
 	}
@@ -231,29 +240,55 @@ func (d *Decoder) unmarshalValue(ctx *searchContext, v reflect.Value, xpath stri
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(s, 0, v.Type().Bits())
 		if err != nil {
-			return fmt.Errorf("invalid format of int. error=%v", err)
+			return d.wrapError(fmt.Errorf("invalid format of int. error=%v", err), node)
 		}
 		v.SetInt(n)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		n, err := strconv.ParseUint(s, 0, v.Type().Bits())
 		if err != nil {
-			return fmt.Errorf("invalid format of uint. error=%v", err)
+			return d.wrapError(fmt.Errorf("invalid format of uint. error=%v", err), node)
 		}
 		v.SetUint(n)
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(s, v.Type().Bits())
 		if err != nil {
-			return fmt.Errorf("invalid format of float. error=%v", err)
+			return d.wrapError(fmt.Errorf("invalid format of float. error=%v", err), node)
 		}
 		v.SetFloat(n)
 	case reflect.Interface:
 		v0 := reflect.ValueOf(s)
 		v.Set(v0)
 	default:
-		return fmt.Errorf("unsupported type. type=%s", v.Type())
+		return d.wrapError(fmt.Errorf("unsupported type. type=%s", v.Type()), node)
 	}
 
 	return nil
+}
+
+func (d *Decoder) wrapError(err error, node *html.Node) error {
+	if err == nil {
+		return nil
+	}
+
+	var unmarshalErr *UnmarshalError
+	if errors.As(err, &unmarshalErr) {
+		return err
+	}
+
+	if d.locator == nil {
+		return err
+	}
+
+	lineNumber, context, ok := d.locator.Location(node)
+	if !ok {
+		return err
+	}
+
+	return &UnmarshalError{
+		Err:        err,
+		LineNumber: lineNumber,
+		Context:    context,
+	}
 }
 
 // Resolve pointers and interfaces to their underlying values,
