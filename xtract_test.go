@@ -54,6 +54,13 @@ func TestDecodeInvalidDocument(t *testing.T) {
 	}
 }
 
+type invalidCustomTime struct{}
+
+func (t *invalidCustomTime) UnmarshalXPath(data []byte) error {
+	_, err := time.Parse("2006-01-02 15:04:05", string(data))
+	return err
+}
+
 type customTime struct {
 	time.Time
 }
