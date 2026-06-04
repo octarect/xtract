@@ -9,6 +9,8 @@ import (
 	"golang.org/x/net/html"
 )
 
+const maxDisplayedSourceLineLength = 120
+
 type UnmarshalError struct {
 	Err        error
 	LineNumber int
@@ -25,7 +27,7 @@ func (e *UnmarshalError) Error() string {
 			if line.Number == e.LineNumber {
 				prefix = ">"
 			}
-			fmt.Fprintf(&b, "%s %*d | %s\n", prefix, width, line.Number, line.Text)
+			fmt.Fprintf(&b, "%s %*d | %s\n", prefix, width, line.Number, truncateSourceLine(line.Text))
 		}
 		return strings.TrimRight(b.String(), "\n")
 	}
@@ -146,4 +148,15 @@ func splitSourceLines(source []byte) []string {
 		lines[i] = strings.TrimRight(string(rawLine), "\r")
 	}
 	return lines
+}
+
+func truncateSourceLine(s string) string {
+	runes := []rune(s)
+	if len(runes) <= maxDisplayedSourceLineLength {
+		return s
+	}
+	if maxDisplayedSourceLineLength <= 3 {
+		return string(runes[:maxDisplayedSourceLineLength])
+	}
+	return string(runes[:maxDisplayedSourceLineLength-3]) + "..."
 }

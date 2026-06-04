@@ -375,6 +375,27 @@ func TestUnmarshalErrorFormatsAlignedContext(t *testing.T) {
 	}
 }
 
+func TestUnmarshalErrorTruncatesLongContextLine(t *testing.T) {
+	longLine := strings.Repeat("x", 140)
+
+	err := (&UnmarshalError{
+		Err:        fmt.Errorf("boom"),
+		XPath:      "//div",
+		LineNumber: 1,
+		Context: []SourceLine{
+			{Number: 1, Text: longLine},
+		},
+	}).Error()
+
+	wantLine := "> 1 | " + strings.Repeat("x", 117) + "..."
+	if !strings.Contains(err, `Error: boom`) || !strings.Contains(err, `  XPath: "//div"`) {
+		t.Fatalf("expected error %q to contain xpath", err)
+	}
+	if !strings.Contains(err, wantLine) {
+		t.Fatalf("expected error %q to contain %q", err, wantLine)
+	}
+}
+
 func TestDereference(t *testing.T) {
 	str := "foo"
 
