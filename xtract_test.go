@@ -292,8 +292,8 @@ func TestUnmarshalErrorIncludesHTMLLine(t *testing.T) {
 				Field int `xpath:"//*[@id='text']"`
 			}{},
 			wantParts: []string{
-				`invalid format of int. error=strconv.ParseInt: parsing "foo": invalid syntax`,
-				`html line 2:`,
+				`Error: invalid format of int. error=strconv.ParseInt: parsing "foo": invalid syntax`,
+				`  XPath: "//*[@id='text']"`,
 				`> 2 |   <span id="text">foo</span>`,
 				`  1 | <div>`,
 				`  3 |   <span id="time">not-a-time</span>`,
@@ -306,8 +306,8 @@ func TestUnmarshalErrorIncludesHTMLLine(t *testing.T) {
 				Field invalidCustomTime `xpath:"//*[@id='time']"`
 			}{},
 			wantParts: []string{
-				`cannot parse "not-a-time" as "2006"`,
-				`html line 3:`,
+				`Error: parsing time "not-a-time" as "2006-01-02 15:04:05": cannot parse "not-a-time" as "2006"`,
+				`  XPath: "//*[@id='time']"`,
 				`  1 | <div>`,
 				`  2 |   <span id="text">foo</span>`,
 				`> 3 |   <span id="time">not-a-time</span>`,
@@ -316,13 +316,15 @@ func TestUnmarshalErrorIncludesHTMLLine(t *testing.T) {
 			},
 		},
 		{
+			// Attribute selections use a different node shape than element matches,
+			// so this verifies that error context still points back to the owning HTML line.
 			name: "attribute base64 error",
 			input: &struct {
 				Field []byte `xpath:"//*[@id='base64']/@data-value"`
 			}{},
 			wantParts: []string{
-				`illegal base64 data at input byte 3`,
-				`html line 4:`,
+				`Error: illegal base64 data at input byte 3`,
+				`  XPath: "//*[@id='base64']/@data-value"`,
 				`  2 |   <span id="text">foo</span>`,
 				`  3 |   <span id="time">not-a-time</span>`,
 				`> 4 |   <span id="base64" data-value="not-base64">payload</span>`,
@@ -350,6 +352,7 @@ func TestUnmarshalErrorIncludesHTMLLine(t *testing.T) {
 func TestUnmarshalErrorFormatsAlignedContext(t *testing.T) {
 	err := (&UnmarshalError{
 		Err:        fmt.Errorf("boom"),
+		XPath:      "//li[3]",
 		LineNumber: 10,
 		Context: []SourceLine{
 			{Number: 8, Text: ""},
@@ -361,6 +364,8 @@ func TestUnmarshalErrorFormatsAlignedContext(t *testing.T) {
 	}).Error()
 
 	wantParts := []string{
+		`Error: boom`,
+		`  XPath: "//li[3]"`,
 		"  8 | ",
 		"  9 |           xxx",
 		"> 10 |          <li data-key=\"int\">-123</li>",

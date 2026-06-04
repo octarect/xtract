@@ -68,7 +68,7 @@ func (d *Decoder) unmarshal(ctx *searchContext, v reflect.Value, xpath string) e
 			return err
 		}
 		if err := u.UnmarshalXPath([]byte(s)); err != nil {
-			return d.wrapError(err, node)
+			return d.wrapError(err, node, xpath)
 		}
 		return nil
 	}
@@ -179,7 +179,7 @@ func (d *Decoder) unmarshalByteSlice(ctx *searchContext, v reflect.Value, xpath 
 		}
 		b64Bytes, err := base64.StdEncoding.DecodeString(b64Str)
 		if err != nil {
-			return d.wrapError(err, ctxs[0].source)
+			return d.wrapError(err, ctxs[0].source, xpath)
 		}
 		v.SetBytes(b64Bytes)
 	} else {
@@ -240,32 +240,32 @@ func (d *Decoder) unmarshalValue(ctx *searchContext, v reflect.Value, xpath stri
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(s, 0, v.Type().Bits())
 		if err != nil {
-			return d.wrapError(fmt.Errorf("invalid format of int. error=%v", err), node)
+			return d.wrapError(fmt.Errorf("invalid format of int. error=%v", err), node, xpath)
 		}
 		v.SetInt(n)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		n, err := strconv.ParseUint(s, 0, v.Type().Bits())
 		if err != nil {
-			return d.wrapError(fmt.Errorf("invalid format of uint. error=%v", err), node)
+			return d.wrapError(fmt.Errorf("invalid format of uint. error=%v", err), node, xpath)
 		}
 		v.SetUint(n)
 	case reflect.Float32, reflect.Float64:
 		n, err := strconv.ParseFloat(s, v.Type().Bits())
 		if err != nil {
-			return d.wrapError(fmt.Errorf("invalid format of float. error=%v", err), node)
+			return d.wrapError(fmt.Errorf("invalid format of float. error=%v", err), node, xpath)
 		}
 		v.SetFloat(n)
 	case reflect.Interface:
 		v0 := reflect.ValueOf(s)
 		v.Set(v0)
 	default:
-		return d.wrapError(fmt.Errorf("unsupported type. type=%s", v.Type()), node)
+		return d.wrapError(fmt.Errorf("unsupported type. type=%s", v.Type()), node, xpath)
 	}
 
 	return nil
 }
 
-func (d *Decoder) wrapError(err error, node *html.Node) error {
+func (d *Decoder) wrapError(err error, node *html.Node, xpath string) error {
 	if err == nil {
 		return nil
 	}
@@ -286,6 +286,7 @@ func (d *Decoder) wrapError(err error, node *html.Node) error {
 
 	return &UnmarshalError{
 		Err:        err,
+		XPath:      xpath,
 		LineNumber: lineNumber,
 		Context:    context,
 	}

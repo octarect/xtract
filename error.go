@@ -13,6 +13,7 @@ const maxDisplayedSourceLineLength = 120
 
 type UnmarshalError struct {
 	Err        error
+	XPath      string
 	LineNumber int
 	Context    []SourceLine
 }
@@ -21,7 +22,8 @@ func (e *UnmarshalError) Error() string {
 	if e.LineNumber > 0 && len(e.Context) > 0 {
 		var b strings.Builder
 		width := len(fmt.Sprintf("%d", e.Context[len(e.Context)-1].Number))
-		fmt.Fprintf(&b, "%v\nhtml line %d:\n", e.Err, e.LineNumber)
+		fmt.Fprintf(&b, "Error: %v\n", e.Err)
+		fmt.Fprintf(&b, "  XPath: %q\n", e.XPath)
 		for _, line := range e.Context {
 			prefix := " "
 			if line.Number == e.LineNumber {
@@ -30,6 +32,9 @@ func (e *UnmarshalError) Error() string {
 			fmt.Fprintf(&b, "%s %*d | %s\n", prefix, width, line.Number, truncateSourceLine(line.Text))
 		}
 		return strings.TrimRight(b.String(), "\n")
+	}
+	if e.XPath != "" {
+		return fmt.Sprintf("Error: %v\n  XPath: %q", e.Err, e.XPath)
 	}
 	return e.Err.Error()
 }
